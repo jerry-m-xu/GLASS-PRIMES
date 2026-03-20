@@ -103,11 +103,11 @@ def download_pdb_from_swissmodel(uniprot_id: str, session=None, timeout: int = 3
                 elif resp.status_code == 429:
                     # Rate limited - wait and retry
                     wait_time = RETRY_DELAY * (2 ** attempt)  # Exponential backoff
-                    print(f"⚠️  Rate limited (429) for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}")
+                    print(f"Rate limited (429) for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}")
                     time.sleep(wait_time)
                     continue
                 elif resp.status_code == 404:
-                    print(f"⚠️  PDB not found (404) for {uniprot_id}")
+                    print(f"PDB not found (404) for {uniprot_id}")
                     return False
                 else:
                     print(f"Warning: HTTP {resp.status_code} for ID {uniprot_id}", file=sys.stderr)
@@ -125,11 +125,11 @@ def download_pdb_from_swissmodel(uniprot_id: str, session=None, timeout: int = 3
                         elif resp.status == 429:
                             # Rate limited - wait and retry
                             wait_time = RETRY_DELAY * (2 ** attempt)
-                            print(f"⚠️  Rate limited (429) for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}")
+                            print(f"Rate limited (429) for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}")
                             time.sleep(wait_time)
                             continue
                         elif resp.status == 404:
-                            print(f"⚠️  PDB not found (404) for {uniprot_id}")
+                            print(f"PDB not found (404) for {uniprot_id}")
                             return False
                         else:
                             print(f"Warning: HTTP {resp.status} for ID {uniprot_id}", file=sys.stderr)
@@ -138,11 +138,11 @@ def download_pdb_from_swissmodel(uniprot_id: str, session=None, timeout: int = 3
                     if e.code == 429:
                         # Rate limited - wait and retry
                         wait_time = RETRY_DELAY * (2 ** attempt)
-                        print(f"⚠️  Rate limited (429) for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}")
+                        print(f"Rate limited (429) for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}")
                         time.sleep(wait_time)
                         continue
                     elif e.code == 404:
-                        print(f"⚠️  PDB not found (404) for {uniprot_id}")
+                        print(f"PDB not found (404) for {uniprot_id}")
                         return False
                     else:
                         print(f"Warning: HTTPError {e.code} for ID {uniprot_id}", file=sys.stderr)
@@ -153,7 +153,7 @@ def download_pdb_from_swissmodel(uniprot_id: str, session=None, timeout: int = 3
         except Exception as e:
             if attempt < MAX_RETRIES:
                 wait_time = RETRY_DELAY * (2 ** attempt)
-                print(f"⚠️  Exception for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}: {e}")
+                print(f"Exception for {uniprot_id}, waiting {wait_time:.1f}s before retry {attempt + 1}/{MAX_RETRIES + 1}: {e}")
                 time.sleep(wait_time)
                 continue
             else:
@@ -175,10 +175,10 @@ def download_worker(args):
     end_time = time.perf_counter()
 
     if success:
-        print(f"✅ OK ({end_time - start_time:.2f}s)")
+        print(f"OK ({end_time - start_time:.2f}s)")
         return True
     else:
-        print("❌ Failed")
+        print("Failed")
         return False
 
 def collect_ids_from_parquet(parquet_path: str, col1: str, col2: str, max_pairs: int, start_row: int = 0) -> "tuple[set, int, int]":
@@ -283,11 +283,11 @@ def format_time(seconds):
 def main():
     start_time = time.time()
 
-    print(f"📂 Input Parquet: {INPUT_PARQUET}")
-    print(f"📁 Output Directory: {OUTPUT_DIR}")
-    print(f"⚡ Download settings: {MAX_WORKERS} workers, {DOWNLOAD_DELAY}s delay, {TIMEOUT}s timeout")
-    print(f"📍 Starting at row: {START_ROW}")
-    print(f"⏰ Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Input Parquet: {INPUT_PARQUET}")
+    print(f"Output Directory: {OUTPUT_DIR}")
+    print(f"Download settings: {MAX_WORKERS} workers, {DOWNLOAD_DELAY}s delay, {TIMEOUT}s timeout")
+    print(f"Starting at row: {START_ROW}")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-" * 60)
 
     # Ensure output directory exists
@@ -300,10 +300,10 @@ def main():
         print(f"Error while reading parquet file: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"📊 Processed {pairs_processed} pairs (limit {MAX_PAIRS})")
-    print(f"📍 Last row processed: {last_row}")
-    print(f"🔍 Collected {len(ids)} unique IDs")
-    print(f"💾 Downloading PDBs from Swiss-Model to: {OUTPUT_DIR}")
+    print(f"Processed {pairs_processed} pairs (limit {MAX_PAIRS})")
+    print(f"Last row processed: {last_row}")
+    print(f"Collected {len(ids)} unique IDs")
+    print(f"Downloading PDBs from Swiss-Model to: {OUTPUT_DIR}")
     print("-" * 60)
 
     # Check existing files in local directory
@@ -322,7 +322,7 @@ def main():
         print(f"⏭️  Skipping {skip_count} already existing files in local directory")
 
     if not ids_to_download:
-        print("✅ All files already exist in local directory!")
+        print("All files already exist in local directory!")
         return
 
     print(f"🚀 Starting parallel download of {len(ids_to_download)} files with {MAX_WORKERS} workers...")
@@ -355,17 +355,17 @@ def main():
     # Final summary
     total_time = time.time() - start_time
     print("-" * 60)
-    print(f"🎉 Download Complete!")
-    print(f"✅ Success: {success_count}")
-    print(f"⏭️  Skipped: {skip_count}")
-    print(f"❌ Failed: {fail_count}")
-    print(f"📍 Last row processed: {last_row}")
-    print(f"💡 To resume, set START_ROW = {last_row + 1}")
-    print(f"📁 Files saved to: {os.path.abspath(OUTPUT_DIR)}")
-    print(f"⏱️  Total time: {format_time(total_time)}")
+    print(f"Download Complete!")
+    print(f"Success: {success_count}")
+    print(f"Skipped: {skip_count}")
+    print(f"Failed: {fail_count}")
+    print(f"Last row processed: {last_row}")
+    print(f"To resume, set START_ROW = {last_row + 1}")
+    print(f"Files saved to: {os.path.abspath(OUTPUT_DIR)}")
+    print(f"Total time: {format_time(total_time)}")
     if len(ids_to_download) > 0:
-        print(f"🚀 Average time per file: {total_time/len(ids_to_download):.2f}s")
-    print(f"⏰ Finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Average time per file: {total_time/len(ids_to_download):.2f}s")
+    print(f"Finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == "__main__":
     main()
