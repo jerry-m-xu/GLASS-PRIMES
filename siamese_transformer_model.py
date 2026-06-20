@@ -38,25 +38,36 @@ class SiameseTransformerNet(nn.Module):
     Uses self-attention to capture sequence dependencies and local structure patterns.
     Relies on ProtTrans embeddings' inherent positional information.
     """
-    def __init__(self, input_dim, hidden_dim=512, output_dim=512, 
-                 nhead=4, num_layers=2, dropout=0.1, max_seq_len=300):                 
+    def __init__(
+        self,
+        input_dim,
+        hidden_dim=512,
+        output_dim=512,
+        nhead=4,
+        num_layers=2,
+        dropout=0.1,
+        max_seq_len=300,
+        dim_feedforward=1024,
+    ):
         super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.max_seq_len = max_seq_len
-        
-        # Input projection block: linear
-        self.input_projection = nn.Linear(input_dim, hidden_dim)
-        
-        # Transformer encoder layers
+
+        self.input_projection = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+        )
+        # Single Linear wrapped in Sequential to match checkpoint key names (.0.*)
+        self.output_projection = nn.Sequential(
+            nn.Linear(hidden_dim, output_dim),
+        )
+
         self.transformer_layers = nn.ModuleList([
-            TransformerEncoderLayer(hidden_dim, nhead, hidden_dim * 4, dropout)
+            TransformerEncoderLayer(hidden_dim, nhead, dim_feedforward, dropout)
             for _ in range(num_layers)
         ])
-        
-        # Output projection block: linear
-        self.output_projection = nn.Linear(hidden_dim, output_dim)
         
         # Attention pooling for global embedding (last linear outputs 1)
         self.global_attention = nn.Sequential(
@@ -155,23 +166,21 @@ class SiameseTransformerNet(nn.Module):
         # Weighted sum
         global_embedding = torch.sum(embeddings * attention_weights, dim=1)  # [batch_size, output_dim]
         return global_embedding
-    
+
     def get_protein_embedding(self, x, mask=None):
         """
         Get embedding for a single protein (for inference).
-        
+
         Args:
             x: ProtTrans embeddings for a single protein [seq_len, input_dim]
             mask: Padding mask [seq_len] (optional)
-        
+
         Returns:
             global_embedding: Global embedding [output_dim]
         """
-        # Add batch dimension
-        x = x.unsqueeze(0)  # [1, seq_len, input_dim]
+        x = x.unsqueeze(0)
         if mask is not None:
-            mask = mask.unsqueeze(0)  # [1, seq_len]
-        
-        # Process through transformer
+            mask = mask.unsqueeze(0)
+
         _, global_emb = self._process_protein(x, mask)
-        return global_emb.squeeze(0)  # [output_dim] 
+        return global_emb.squeeze(0)

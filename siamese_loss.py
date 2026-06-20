@@ -97,13 +97,26 @@ class TMLDDTLoss(torch.nn.Module):
         if not alignment:
             return torch.tensor(0.0, device=emb1.device)
         
-        # Extract aligned indices
-        model_indices, ref_indices = zip(*alignment)
-        
-        # Select aligned embeddings and lddt scores
-        aligned_emb1 = emb1[list(model_indices)]
-        aligned_emb2 = emb2[list(ref_indices)]
-        aligned_targets = lddt_scores[list(model_indices)].to(emb1.device)
+        # parse_alignment_from_sequences(seqxA, seqM, seqyA) yields (ref_idx, model_idx)
+        # with seqxA = reference (TM-align chain 1), seqyA = model (chain 2).
+        ref_indices, model_indices = zip(*alignment)
+        L1, L2 = emb1.shape[0], emb2.shape[0]
+        Lt = lddt_scores.shape[0]
+        pairs = [
+            (int(r), int(m))
+            for r, m in zip(ref_indices, model_indices)
+            if 0 <= int(r) < L1 and 0 <= int(m) < L2 and 0 <= int(m) < Lt
+        ]
+        if not pairs:
+            return torch.tensor(0.0, device=emb1.device)
+
+        ref_ix = torch.tensor([p[0] for p in pairs], device=emb1.device, dtype=torch.long)
+        mod_ix = torch.tensor([p[1] for p in pairs], device=emb1.device, dtype=torch.long)
+
+        # emb1 / seq1 = reference, emb2 / seq2 = model; lddt padded vector is indexed by model residue
+        aligned_emb1 = emb1[ref_ix]
+        aligned_emb2 = emb2[mod_ix]
+        aligned_targets = lddt_scores[mod_ix].to(emb1.device)
         
         # Compute cosine similarities between aligned residues
         similarities = torch.cosine_similarity(aligned_emb1, aligned_emb2, dim=1)

@@ -1,9 +1,11 @@
-import torch
-import numpy as np
-from siamese_transformer_model import SiameseTransformerNet
-import pickle
 import os
+import pickle
+
+import numpy as np
+import torch
 import torch.nn.functional as F
+
+from siamese_transformer_model import SiameseTransformerNet
 
 
 class SiameseInference:
@@ -40,29 +42,27 @@ class SiameseInference:
             config: Model configuration
         """
         print(f"Loading transformer model from {model_path}...")
-        
-        checkpoint = torch.load(model_path, map_location='cpu')
-        config = checkpoint['config']
-        
-        # Create SiameseTransformerNet model
+
+        checkpoint = torch.load(model_path, map_location="cpu")
+        config = checkpoint["config"]
+
         model = SiameseTransformerNet(
-            input_dim=config['prottrans_dim'],
-            hidden_dim=config['hidden_dim'],
-            output_dim=config['output_dim'],
-            nhead=config['nhead'],
-            num_layers=config['num_layers'],
-            dropout=config['dropout'],
-            max_seq_len=config['max_seq_len']
+            input_dim=config["prottrans_dim"],
+            hidden_dim=config["hidden_dim"],
+            output_dim=config["output_dim"],
+            nhead=config["nhead"],
+            num_layers=config["num_layers"],
+            dropout=config["dropout"],
+            max_seq_len=config["max_seq_len"],
+            dim_feedforward=config.get("dim_feedforward", 1024),
         )
-        
-        # Load trained weights
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
-        
-        print(f"Model loaded successfully!")
+
+        print("Model loaded successfully!")
         print(f"Training loss: {checkpoint['loss']:.4f}")
         print(f"Epoch: {checkpoint['epoch']}")
-        
+
         return model, config
     
     def compute_similarity_scores(self, prot1_emb, prot2_emb, prot1_mask=None, prot2_mask=None):
