@@ -9,9 +9,16 @@ def pairwise_dist(x):
     return np.sqrt((diff ** 2).sum(-1))
 
 
-def squared_feature_dist(F1, F2):
-    diff = F1[:, None, :] - F2[None, :, :]
-    return np.sum(diff ** 2, axis=-1)
+def cosine_feature_dist(F1, F2):
+    F1_norm = F1 / (np.linalg.norm(F1, axis=1, keepdims=True) + 1e-9)
+    F2_norm = F2 / (np.linalg.norm(F2, axis=1, keepdims=True) + 1e-9)
+    similarity = F1_norm @ F2_norm.T
+    return 1 - np.clip(similarity, -1, 1)
+
+
+def normalize_cost_matrix(C):
+    mean_cost = np.mean(C[C > 0])
+    return C / mean_cost
 
 
 # computes the Sinkhorn transport plan
@@ -30,7 +37,7 @@ def sinkhorn(C, a, b, eps=0.05, n_iter=30):
 
 # computes the FGW loss based off both the structure and the features
 
-def fgw_loss(C1, C2, F1, F2, T, alpha=0.7):
+def fgw_terms(C1, C2, F1, F2, T, D_feat=None):
 
     # structural term
     a = T @ np.ones(T.shape[1])
@@ -43,8 +50,15 @@ def fgw_loss(C1, C2, F1, F2, T, alpha=0.7):
     )
 
     # feature term
-    term_feat = np.sum(squared_feature_dist(F1, F2) * T)
+    if D_feat is None:
+        D_feat = cosine_feature_dist(F1, F2)
+    term_feat = np.sum(D_feat * T)
 
+    return term_struct, term_feat
+
+
+def fgw_loss(C1, C2, F1, F2, T, alpha=0.7, D_feat=None):
+    term_struct, term_feat = fgw_terms(C1, C2, F1, F2, T, D_feat=D_feat)
     return alpha * term_struct + (1 - alpha) * term_feat
 
 
@@ -66,23 +80,36 @@ def compute_fgw_from_features(
         F2,
         alpha=0.7,
         eps=0.05,
-        sinkhorn_iter=30):
+        sinkhorn_iter=30,
+        normalize=True,
+        return_components=False):
     C1 = pairwise_dist(X)
     C2 = pairwise_dist(Y)
+    M_feat = cosine_feature_dist(F1, F2)
+
+    if normalize:
+        C1 = normalize_cost_matrix(C1)
+        C2 = normalize_cost_matrix(C2)
+        M_feat = normalize_cost_matrix(M_feat)
 
     n, m = len(X), len(Y)
     a = np.ones(n) / n
     b = np.ones(m) / m
 
     T = np.outer(a, b)
-    M_feat = squared_feature_dist(F1, F2)
 
     for _ in range(sinkhorn_iter):
         M_geom = fgw_cost_matrix(C1, C2, T)
         C = alpha * M_geom + (1 - alpha) * M_feat
         T = sinkhorn(C, a, b, eps=eps, n_iter=20)
 
-    return fgw_loss(C1, C2, F1, F2, T, alpha)
+    term_struct, term_feat = fgw_terms(C1, C2, F1, F2, T, D_feat=M_feat)
+    score = alpha * term_struct + (1 - alpha) * term_feat
+
+    if return_components:
+        return score, term_struct, term_feat
+
+    return score
 
 # computes the FGW distance
 
@@ -92,7 +119,8 @@ def compute_fgw(pdb1, pdb2,
                 sinkhorn_iter=30,
                 device="cpu",
                 model=None,
-                batch_converter=None):
+                batch_converter=None,
+                normalize=True):
     if model is None or batch_converter is None:
         model, _, batch_converter = load_esm()
 
@@ -112,6 +140,7 @@ def compute_fgw(pdb1, pdb2,
         alpha=alpha,
         eps=eps,
         sinkhorn_iter=sinkhorn_iter,
+        normalize=normalize,
     )
 
 
