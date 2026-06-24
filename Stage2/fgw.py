@@ -21,6 +21,10 @@ def normalize_cost_matrix(C):
     return C / mean_cost
 
 
+def exponential_scaled_distance(value, scale):
+    return 1 - np.exp(-value / scale)
+
+
 # computes the Sinkhorn transport plan
 
 def sinkhorn(C, a, b, eps=0.05, n_iter=30):
@@ -82,6 +86,7 @@ def compute_fgw_from_features(
         eps=0.05,
         sinkhorn_iter=30,
         normalize=True,
+        structure_exp_scale=None,
         return_components=False):
     C1 = pairwise_dist(X)
     C2 = pairwise_dist(Y)
@@ -104,6 +109,8 @@ def compute_fgw_from_features(
         T = sinkhorn(C, a, b, eps=eps, n_iter=20)
 
     term_struct, term_feat = fgw_terms(C1, C2, F1, F2, T, D_feat=M_feat)
+    if structure_exp_scale is not None:
+        term_struct = exponential_scaled_distance(term_struct, structure_exp_scale)
     score = alpha * term_struct + (1 - alpha) * term_feat
 
     if return_components:
@@ -120,7 +127,8 @@ def compute_fgw(pdb1, pdb2,
                 device="cpu",
                 model=None,
                 batch_converter=None,
-                normalize=True):
+                normalize=True,
+                structure_exp_scale=None):
     if model is None or batch_converter is None:
         model, _, batch_converter = load_esm()
 
@@ -141,6 +149,7 @@ def compute_fgw(pdb1, pdb2,
         eps=eps,
         sinkhorn_iter=sinkhorn_iter,
         normalize=normalize,
+        structure_exp_scale=structure_exp_scale,
     )
 
 

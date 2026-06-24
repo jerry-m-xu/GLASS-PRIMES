@@ -51,12 +51,9 @@ def compute_local_fgw(
         alpha=ALPHA,
         eps=EPS,
         sinkhorn_iter=SINKHORN_ITER,
+        structure_exp_scale=STRUCTURE_EXP_SCALE,
         return_components=True,
     )
-
-
-def exponential_scaled_distance(value: float, scale: float) -> float:
-    return 1 - np.exp(-value / scale)
 
 
 def knn_indices(coords: np.ndarray, residue_idx: int) -> np.ndarray:
@@ -158,7 +155,6 @@ def output_fields():
         "aa2",
         "fgw_score",
         "fgw_structure_term",
-        "fgw_structure_exp_scaled",
         "fgw_feature_term",
         "neighborhood_size1",
         "neighborhood_size2",
@@ -172,7 +168,6 @@ def write_result(
     residue_pair,
     fgw_score,
     structure_term,
-    structure_exp_scaled,
     feature_term,
     n1,
     n2,
@@ -195,7 +190,6 @@ def write_result(
             "aa2": aa2,
             "fgw_score": fgw_score,
             "fgw_structure_term": structure_term,
-            "fgw_structure_exp_scaled": structure_exp_scaled,
             "fgw_feature_term": feature_term,
             "neighborhood_size1": n1,
             "neighborhood_size2": n2,
@@ -227,10 +221,6 @@ def process_tm_row(row, input_row_idx, writer):
             embeddings1[indices1],
             embeddings2[indices2],
         )
-        structure_exp_scaled = exponential_scaled_distance(
-            structure_term,
-            STRUCTURE_EXP_SCALE,
-        )
 
         write_result(
             writer,
@@ -239,7 +229,6 @@ def process_tm_row(row, input_row_idx, writer):
             residue_pair,
             fgw_score,
             structure_term,
-            structure_exp_scaled,
             feature_term,
             len(indices1),
             len(indices2),
