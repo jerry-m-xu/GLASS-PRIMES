@@ -13,14 +13,16 @@ from parse_pdb import parse_pdb
 PARQUET_PATH = "/jet/home/jxu23/OCEANDIR/swiss_under_1000_320M.parquet"
 PDB_DIR = "/jet/home/jxu23/OCEANDIR/pdbs"
 OUTPUT_CSV = "/jet/home/jxu23/OCEANDIR/tm_scores.csv"
+PROGRESS_FILE = "/jet/home/jxu23/OCEANDIR/tm_data_progress.txt"
 
-START_ROW = 0
-END_ROW = 100
+START_ROW = 32000
+END_ROW = 100000
 
 COL1 = "chain_1"
 COL2 = "chain_2"
 
 MAX_SEQUENCE_LENGTH = 1000
+FLUSH_EVERY_ROWS = 100
 
 
 def pdb_path(uniprot_id: str) -> str:
@@ -126,6 +128,15 @@ def open_output_writer(csv_path: str):
     return output_file, writer
 
 
+def write_progress(row_idx):
+    progress_dir = os.path.dirname(PROGRESS_FILE)
+    if progress_dir:
+        os.makedirs(progress_dir, exist_ok=True)
+
+    with open(PROGRESS_FILE, "w") as progress_file:
+        progress_file.write(str(row_idx))
+
+
 def main():
     if not os.path.exists(PARQUET_PATH):
         print(f"Error: parquet file not found: {PARQUET_PATH}", file=sys.stderr)
@@ -139,9 +150,13 @@ def main():
     print(f"Rows: [{START_ROW}, {END_ROW if END_ROW is not None else 'EOF'})")
     print(f"Max sequence length: {MAX_SEQUENCE_LENGTH}")
     print(f"Output: {OUTPUT_CSV}")
+    print(f"Progress file: {PROGRESS_FILE}")
+    print(f"Flush every rows: {FLUSH_EVERY_ROWS}")
 
     success = 0
     failed = 0
+    rows_since_flush = 0
+    last_row_processed = None
 
     output_file, writer = open_output_writer(OUTPUT_CSV)
     with output_file:
@@ -152,7 +167,6 @@ def main():
                 result = run_tm_align(id1, id2)
                 result["row"] = row_idx
                 writer.writerow(result)
-                output_file.flush()
                 success += 1
                 print(
                     f"[row {row_idx}] {id1} vs {id2}: "
@@ -164,9 +178,21 @@ def main():
                     f"[row {row_idx}] {id1} vs {id2}: skipped ({exc})",
                     file=sys.stderr,
                 )
+            finally:
+                last_row_processed = row_idx
+                rows_since_flush += 1
+                if rows_since_flush >= FLUSH_EVERY_ROWS:
+                    output_file.flush()
+                    write_progress(row_idx)
+                    rows_since_flush = 0
+
+        output_file.flush()
+        if last_row_processed is not None:
+            write_progress(last_row_processed)
 
     print("-" * 60)
     print(f"Done. Successful: {success}, failed/skipped: {failed}")
+    print(f"Last row processed: {last_row_processed}")
     print(f"Results saved to: {os.path.abspath(OUTPUT_CSV)}")
 
 

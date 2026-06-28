@@ -16,9 +16,10 @@ PARQUET_PATH = "/jet/home/jxu23/OCEANDIR/swiss_under_1000_320M.parquet"
 PDB_DIR = "/jet/home/jxu23/OCEANDIR/pdbs"
 EMBEDDING_DIR = "/jet/home/jxu23/OCEANDIR/embeddings"
 MANIFEST_CSV = "/jet/home/jxu23/OCEANDIR/esm_manifest.csv"
+PROGRESS_FILE = "/jet/home/jxu23/OCEANDIR/precompute_esm_progress.txt"
 
 START_ROW = 0
-END_ROW = 100
+END_ROW = 100000
 
 COL1 = "chain_1"
 COL2 = "chain_2"
@@ -56,7 +57,7 @@ def sequence_too_long(protein_id: str, sequence: str) -> bool:
     return True
 
 
-def iter_unique_protein_ids(parquet_path: str):
+def iter_unique_protein_ids(parquet_path: str, progress=None):
     parquet_file = pq.ParquetFile(parquet_path)
     total_rows = parquet_file.metadata.num_rows
 
@@ -72,6 +73,8 @@ def iter_unique_protein_ids(parquet_path: str):
 
         for local_idx, (_, row) in enumerate(df_chunk.iterrows()):
             global_row_idx = current_global_row + local_idx
+            if progress is not None:
+                progress["last_row_processed"] = global_row_idx
 
             if global_row_idx < start_row:
                 continue
@@ -141,6 +144,15 @@ def write_manifest_row(writer, protein_id, sequence_length, shape, status, error
     )
 
 
+def write_progress(row_idx):
+    progress_dir = os.path.dirname(PROGRESS_FILE)
+    if progress_dir:
+        os.makedirs(progress_dir, exist_ok=True)
+
+    with open(PROGRESS_FILE, "w") as progress_file:
+        progress_file.write(str(row_idx))
+
+
 def save_embedding(protein_id: str, embedding: np.ndarray):
     final_path = embedding_path(protein_id)
     tmp_path = f"{final_path}.tmp"
@@ -206,6 +218,7 @@ def main():
     print(f"PDB dir: {PDB_DIR}")
     print(f"Embedding dir: {EMBEDDING_DIR}")
     print(f"Manifest: {MANIFEST_CSV}")
+    print(f"Progress file: {PROGRESS_FILE}")
     print(f"Rows: [{START_ROW}, {END_ROW if END_ROW is not None else 'EOF'})")
     print(f"Max sequence length: {MAX_SEQUENCE_LENGTH}")
     print(f"Device: {DEVICE}")
@@ -217,13 +230,14 @@ def main():
     processed = 0
     skipped_existing = 0
     failed = 0
+    progress = {"last_row_processed": None}
 
     with open(MANIFEST_CSV, "a", newline="") as manifest_file:
         writer = csv.DictWriter(manifest_file, fieldnames=manifest_fields())
         if write_header:
             writer.writeheader()
 
-        for protein_id in iter_unique_protein_ids(PARQUET_PATH):
+        for protein_id in iter_unique_protein_ids(PARQUET_PATH, progress=progress):
             final_path = embedding_path(protein_id)
 
             if os.path.exists(final_path):
@@ -274,6 +288,9 @@ def main():
         f"Done. Saved: {processed}, "
         f"skipped existing: {skipped_existing}, failed: {failed}"
     )
+    print(f"Last row processed: {progress['last_row_processed']}")
+    if progress["last_row_processed"] is not None:
+        write_progress(progress["last_row_processed"])
     print(f"Embeddings saved to: {os.path.abspath(EMBEDDING_DIR)}")
     print(f"Manifest saved to: {os.path.abspath(MANIFEST_CSV)}")
 
